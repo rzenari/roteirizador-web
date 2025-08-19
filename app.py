@@ -15,7 +15,7 @@ import io
 # CONFIGURAÇÕES GLOBAIS
 # ==============================================================================
 # ⚠️ INSIRA SUA CHAVE DA API DO GOOGLE AQUI ⚠️
-CHAVE_API_GOOGLE = "COLE_SUA_CHAVE_DE_API_AQUI" 
+CHAVE_API_GOOGLE = "kbAIzaSyBldtILdvj5UAy_sYCSPrAL637DbclAE3k" 
 FATOR_CUSTO_DISTANCIA = 50
 MINUTOS_POR_KM = 3 # Premissa: Velocidade média de 20 km/h
 
@@ -469,3 +469,4 @@ if all(df is not None for df in dados_config_carregados):
                                     st.download_button("Download Não Roteirizados (CSV)", servicos_nao_atendidos_df.to_csv(index=False, sep=';').encode('utf-8-sig'), "servicos_nao_roteirizados.csv", "text/csv", key='download-nao-roteirizados')
     else:
         st.info("Aguardando o carregamento do arquivo 'servicos.csv' na barra lateral para iniciar.")
+
