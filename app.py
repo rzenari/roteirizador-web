@@ -15,7 +15,7 @@ import io
 # CONFIGURAÇÕES GLOBAIS
 # ==============================================================================
 # ⚠️ INSIRA SUA CHAVE DA API DO GOOGLE AQUI ⚠️
-CHAVE_API_GOOGLE = "kbAIzaSyBldtILdvj5UAy_sYCSPrAL637DbclAE3k" 
+CHAVE_API_GOOGLE = "COLE_SUA_CHAVE_DE_API_AQUI" 
 FATOR_CUSTO_DISTANCIA = 50
 MINUTOS_POR_KM = 3 # Premissa: Velocidade média de 20 km/h
 
@@ -23,7 +23,6 @@ MINUTOS_POR_KM = 3 # Premissa: Velocidade média de 20 km/h
 # FUNÇÕES AUXILIARES DE PROCESSAMENTO
 # ==============================================================================
 
-# ATUALIZAÇÃO: Esta função agora carrega apenas os arquivos de configuração estáticos.
 @st.cache_data
 def carregar_dados_config():
     """Carrega todos os arquivos de configuração estáticos."""
@@ -42,7 +41,6 @@ def carregar_dados_config():
         st.error(f"ERRO ao carregar os dados de configuração: {e}")
         return None, None, None, None, None
 
-# ATUALIZAÇÃO: Nova função para carregar o arquivo de serviços enviado pelo usuário.
 def carregar_dados_servicos(uploaded_file):
     """Carrega o arquivo de serviços enviado pelo usuário."""
     if uploaded_file is None:
@@ -54,9 +52,6 @@ def carregar_dados_servicos(uploaded_file):
     except Exception as e:
         st.error(f"ERRO ao ler o arquivo 'servicos.csv' enviado. Verifique o formato e o separador (deve ser ';'). Detalhe: {e}")
         return None
-
-# As outras funções (preparar_dados, executar_roteirizacao, etc.) permanecem as mesmas
-# A única mudança é que elas receberão os dataframes como argumentos.
 
 @st.cache_data
 def preparar_dados(df_polos, df_equipes, df_servicos_raw, df_feriados, df_tempos, df_fator_k):
@@ -121,7 +116,6 @@ def preparar_dados(df_polos, df_equipes, df_servicos_raw, df_feriados, df_tempos
         return None, None, None, None, None
 
 def verificar_dia_restrito(data_atual, municipios_do_polo, df_feriados):
-    # (Função exatamente como no script original)
     df_feriados.columns = [str(col).strip() for col in df_feriados.columns]
     if data_atual.weekday() in [4, 5, 6]:
         dias_semana = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
@@ -140,15 +134,15 @@ def verificar_dia_restrito(data_atual, municipios_do_polo, df_feriados):
     return False, ""
 
 def obter_distancia_real_google(origem_coords, destino_coords, waypoints_coords, chave_api):
-    # (Função exatamente como no script original)
     if chave_api == "COLE_SUA_CHAVE_DE_API_AQUI" or not chave_api: return None
     base_url = "https://maps.googleapis.com/maps/api/directions/json"
-    origin_str, destination_str = f"{origem_coords[0]},{origem_coords[1]}", f"{destino_coords[0]},{destino_coords[1]}"
-    if len(waypoints_coords) > 25:
-        st.warning(f"AVISO GOOGLE API: Rota com {len(waypoints_coords)} pontos excede o limite de 25. A consulta não será realizada.")
-        return None
+    origin_str = f"{origem_coords[0]},{origem_coords[1]}"
+    destination_str = f"{destino_coords[0]},{destino_coords[1]}"
+    
+    # A função agora assume que recebe uma lista de waypoints dentro do limite
     waypoints_str = "|".join([f"{lat},{lon}" for lat, lon in waypoints_coords])
     params = {"origin": origin_str, "destination": destination_str, "waypoints": f"optimize:true|{waypoints_str}", "key": chave_api}
+    
     try:
         response = requests.get(base_url, params=params)
         response.raise_for_status()
@@ -159,7 +153,6 @@ def obter_distancia_real_google(origem_coords, destino_coords, waypoints_coords,
         return None
 
 def executar_roteirizacao(params):
-    # (Função exatamente como no script original)
     polos_para_processar = params["polos_para_processar"]
     df_servicos_filtrado = params["df_servicos_filtrado"]
     df_polos_completo = params["df_polos_completo"]
@@ -262,13 +255,38 @@ def executar_roteirizacao(params):
                     if pontos_da_rota_indices:
                         equipes_usadas += 1
                         gmaps_url, legs_info = "N/A", None
+                        
+                        # --- ATUALIZAÇÃO: LÓGICA DE QUEBRA DE ROTAS PARA A API ---
                         if consultar_google_api == '1':
                             pontos_coords = [locations[idx + 1] for idx in pontos_da_rota_indices]
                             depot_coords = locations[0]
-                            legs_info = obter_distancia_real_google(depot_coords, depot_coords, pontos_coords, CHAVE_API_GOOGLE)
+                            full_path_points = [depot_coords] + pontos_coords + [depot_coords]
+                            
+                            chunk_size = 27 # Limite da API: origin + 25 waypoints + destination
+                            all_legs_info = []
+
+                            if len(full_path_points) > chunk_size:
+                                st.info(f"Rota da Equipe {tipo_equipe.capitalize()} {vehicle_id + 1} com {len(pontos_coords)} pontos será dividida em chamadas menores para a API do Google.")
+                                for i in range(0, len(full_path_points) - 1, chunk_size - 1):
+                                    chunk = full_path_points[i : i + chunk_size]
+                                    if len(chunk) < 2: continue
+                                    
+                                    chunk_origin, chunk_destination, chunk_waypoints = chunk[0], chunk[-1], chunk[1:-1]
+                                    chunk_legs = obter_distancia_real_google(chunk_origin, chunk_destination, chunk_waypoints, CHAVE_API_GOOGLE)
+                                    
+                                    if chunk_legs:
+                                        all_legs_info.extend(chunk_legs)
+                                    else:
+                                        all_legs_info = None; break
+                                legs_info = all_legs_info
+                            else:
+                                legs_info = obter_distancia_real_google(depot_coords, depot_coords, pontos_coords, CHAVE_API_GOOGLE)
+
                             if legs_info:
                                 origin_url, waypoints_url = f"{depot_coords[0]},{depot_coords[1]}", "/".join([f"{lat},{lon}" for lat,lon in pontos_coords])
                                 gmaps_url = f"https://www.google.com/maps/dir/{origin_url}/{waypoints_url}/{origin_url}"
+                            elif len(pontos_coords) > 0:
+                                st.warning(f"AVISO: Falha na consulta à API do Google para a Equipe {tipo_equipe.capitalize()} {vehicle_id + 1}. Usando apenas estimativas locais.")
                         
                         ponto_anterior_loc = locations[0]
                         for i, serv_idx in enumerate(pontos_da_rota_indices):
@@ -311,7 +329,6 @@ def executar_roteirizacao(params):
     return todas_as_rotas_df, servicos_nao_atendidos_df, resumo_equipes_df, pd.DataFrame(dados_relatorio)
 
 def gerar_mapa_de_rotas(df_rotas, df_polos_info, polos_processados):
-    # (Função exatamente como no script original)
     if df_rotas.empty: return None
     polos_filtrados = df_polos_info[df_polos_info['Centro Operativo'].isin(polos_processados)]
     if polos_filtrados.empty: return None
@@ -342,7 +359,6 @@ def gerar_mapa_de_rotas(df_rotas, df_polos_info, polos_processados):
             
     return mapa
 
-
 # ==============================================================================
 # INTERFACE DA APLICAÇÃO WEB (STREAMLIT)
 # ==============================================================================
@@ -350,15 +366,12 @@ def gerar_mapa_de_rotas(df_rotas, df_polos_info, polos_processados):
 st.set_page_config(layout="wide", page_title="Roteirizador Inteligente")
 st.title(" Roteirizador Inteligente ")
 
-# --- Carregamento de Dados ---
 dados_config_carregados = carregar_dados_config()
 
 if all(df is not None for df in dados_config_carregados):
     df_polos, df_equipes, df_feriados, df_tempos, df_fator_k = dados_config_carregados
 
     st.sidebar.header("Parâmetros da Roteirização")
-    
-    # ATUALIZAÇÃO: Adiciona o widget de upload de arquivo
     uploaded_file = st.sidebar.file_uploader("1. Carregue o arquivo 'servicos.csv' do dia", type=["csv"])
 
     if uploaded_file is not None:
@@ -455,4 +468,4 @@ if all(df is not None for df in dados_config_carregados):
                                     st.dataframe(servicos_nao_atendidos_df)
                                     st.download_button("Download Não Roteirizados (CSV)", servicos_nao_atendidos_df.to_csv(index=False, sep=';').encode('utf-8-sig'), "servicos_nao_roteirizados.csv", "text/csv", key='download-nao-roteirizados')
     else:
-        st.info("Aguardando o carregamento do arquivo 'servicos.csv' na barra lateral.")
+        st.info("Aguardando o carregamento do arquivo 'servicos.csv' na barra lateral para iniciar.")
