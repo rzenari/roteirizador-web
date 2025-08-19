@@ -1,0 +1,19 @@
+﻿Equipe;Serviço;Mix_solic;Tempo Execução;;Tempo do turno;Almoço;Total;;Improdutividade_serviços_extras
+Leve;Corte;Medidor;00:12:00;;09:00;01:00;08:00;;4
+Leve;Corte;Poste;00:28:00;;;;;;
+Leve;Corte;Ramal;00:40:00;;;;;;
+Leve;Recorte;Medidor;00:12:00;;;;;;
+Leve;Recorte;Poste;00:28:00;;;;;;
+Leve;Recorte;Ramal;00:40:00;;;;;;
+Leve;Religa;Medidor;00:12:00;;;;;;
+Leve;Religa;Poste;00:28:00;;;;;;
+Leve;Religa;Ramal;00:40:00;;;;;;
+Cesto;Corte;Medidor;00:12:00;;;;;;
+Cesto;Corte;Poste;00:28:00;;;;;;
+Cesto;Corte;Ramal;00:40:00;;;;;;
+Cesto;Recorte;Medidor;00:12:00;;;;;;
+Cesto;Recorte;Poste;00:28:00;;;;;;
+Cesto;Recorte;Ramal;00:40:00;;;;;;
+Cesto;Religa;Medidor;00:12:00;;;;;;
+Cesto;Religa;Poste;00:28:00;;;;;;
+Cesto;Religa;Ramal;00:40:00;;;;;;

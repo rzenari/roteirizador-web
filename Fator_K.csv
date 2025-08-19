@@ -1,0 +1,18 @@
+﻿Centro Operativo;Fator K Estimado;Justificativa (Análise Geográfica)
+ANGRA;1.82;Litoral muito recortado, forte influência da Serra do Mar. Estradas sinuosas (Rio-Santos) que contornam baías e morros, resultando em alta circuidade.
+ARARUAMA;1.52;Terreno relativamente plano, mas com a grande barreira da Lagoa de Araruama, que força longos desvios para conectar pontos em margens opostas.
+CABO FRIO;1.78;Similar a Araruama, com influência da Lagoa e do Oceano Atlântico limitando as rotas diretas. Malha urbana um pouco mais densa.
+NITERÓI;2.19;Topografia muito acidentada (morros), litoral recortado e a barreira da Baía de Guanabara. Deslocamentos internos exigem contornos significativos.
+MARICÁ;1.91;Terreno acidentado com serras (Serra da Tiririca) e o grande sistema lagunar de Maricá como barreiras, o que aumenta a distância real das rotas.
+SÃO GONÇALO;1.78;Malha urbana extremamente densa e orgânica, mas menos acidentada que Niterói. A Baía de Guanabara ainda é uma barreira a oeste.
+ITABORAÍ;1.73;Terreno com relevo mais suave e boa conexão por rodovias principais. Menos barreiras naturais diretas em comparação com as cidades vizinhas.
+DUQUE DE CAXIAS;2.03;Parte da Baixada Fluminense, terreno predominantemente plano. A densidade urbana e a presença de rios são os principais fatores de desvio.
+MAGÉ;1.77;Localização na base da serra e cortada por rios da Baía de Guanabara. Combina áreas planas com o início de um relevo mais acidentado.
+PETROPOLIS;2.57;Região serrana (Serra dos Órgãos), com altíssima sinuosidade nas estradas e ruas. A topografia é o fator dominante, criando a maior circuidade da lista.
+TERESOPOLIS;2.11;Similar a Petrópolis, localizada na Serra dos Órgãos. Ruas e estradas seguem vales e contornam montanhas, com grande diferença entre distância real e reta.
+RESENDE;2.61;Localizada no Vale do Paraíba, com relevo acidentado e a Serra da Mantiqueira próxima. O Rio Paraíba do Sul também atua como barreira.
+CAMPOS;1.66;Terreno majoritariamente plano (Baixada Campista). É a região com a menor circuidade da lista. O fator de desvio vem principalmente da malha urbana e rios.
+MACAÉ;1.45;Combina uma área litorânea plana com um interior de relevo mais acidentado (morros). A malha urbana é cortada por rios.
+CANTAGALO;2.15;"Região serrana, com relevo de ""mares de morros"". Malha viária menos densa e muito sinuosa, seguindo o terreno acidentado."
+ITAPERUNA;2.15;Relevo de morros e vales, mas menos acentuado que a região serrana. As estradas tendem a seguir os vales dos rios.
+PADUA;1.56;Similar a Itaperuna, localizada no noroeste fluminense, com relevo ondulado e influência do Vale do Rio Pomba e Paraíba do Sul.
