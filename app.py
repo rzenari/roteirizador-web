@@ -363,7 +363,7 @@ def gerar_mapa_de_rotas(df_rotas, df_polos_info, polos_processados):
 # ==============================================================================
 
 st.set_page_config(layout="wide", page_title="Roteirizador Credit RJ")
-st.title(" Roteirizador Inteligente ")
+st.title(" Roteirizador Credit RJ ")
 
 dados_config_carregados = carregar_dados_config()
 
@@ -468,3 +468,4 @@ if all(df is not None for df in dados_config_carregados):
                                     st.download_button("Download Não Roteirizados (CSV)", servicos_nao_atendidos_df.to_csv(index=False, sep=';').encode('utf-8-sig'), "servicos_nao_roteirizados.csv", "text/csv", key='download-nao-roteirizados')
     else:
         st.info("Aguardando o carregamento do arquivo 'servicos.csv' na barra lateral para iniciar.")
+
