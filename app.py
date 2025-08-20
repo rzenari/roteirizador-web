@@ -14,7 +14,7 @@ import io
 # ==============================================================================
 # CONFIGURAÇÕES GLOBAIS
 # ==============================================================================
-# ATUALIZAÇÃO: A chave da API agora é lida dos segredos do Streamlit
+# A chave da API agora é lida dos segredos do Streamlit
 try:
     CHAVE_API_GOOGLE = st.secrets["GOOGLE_API_KEY"]
 except (KeyError, FileNotFoundError):
@@ -362,8 +362,18 @@ def gerar_mapa_de_rotas(df_rotas, df_polos_info, polos_processados):
 # INTERFACE DA APLICAÇÃO WEB (STREAMLIT)
 # ==============================================================================
 
-st.set_page_config(layout="wide", page_title="Roteirizador Credit RJ")
-st.title(" Roteirizador Credit RJ ")
+st.set_page_config(layout="wide", page_title="Roteirizador Inteligente")
+
+# --- ATUALIZAÇÃO: Título com Logo ---
+col1, col2 = st.columns([5, 1]) # Coluna do título maior que a do logo
+with col1:
+    st.title(" Roteirizador Inteligente ")
+with col2:
+    try:
+        st.image("Enel_Brasil_Nova_Marca.png", width=150)
+    except Exception:
+        # Se a imagem não for encontrada, o app não quebra.
+        pass
 
 dados_config_carregados = carregar_dados_config()
 
@@ -468,4 +478,3 @@ if all(df is not None for df in dados_config_carregados):
                                     st.download_button("Download Não Roteirizados (CSV)", servicos_nao_atendidos_df.to_csv(index=False, sep=';').encode('utf-8-sig'), "servicos_nao_roteirizados.csv", "text/csv", key='download-nao-roteirizados')
     else:
         st.info("Aguardando o carregamento do arquivo 'servicos.csv' na barra lateral para iniciar.")
-
