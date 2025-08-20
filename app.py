@@ -12,19 +12,49 @@ import requests
 import io
 
 # ==============================================================================
+# FUNÇÃO DE LOGIN
+# ==============================================================================
+
+def check_password():
+    """Retorna `True` se o usuário fez login com sucesso."""
+
+    def login_form():
+        """Cria e exibe o formulário de login."""
+        with st.form("credentials"):
+            st.text_input("Usuário", key="username")
+            st.text_input("Senha", type="password", key="password")
+            st.form_submit_button("Entrar", on_click=password_entered)
+
+    def password_entered():
+        """Verifica se a senha está correta e atualiza o estado da sessão."""
+        if (
+            st.session_state["username"] == "usuario_piloto"
+            and st.session_state["password"] == "piloto"
+        ):
+            st.session_state["authenticated"] = True
+        else:
+            st.session_state["authenticated"] = False
+            st.error("Usuário ou senha incorreto.")
+
+    if st.session_state.get("authenticated", False):
+        return True
+    else:
+        login_form()
+        return False
+
+# ==============================================================================
 # CONFIGURAÇÕES GLOBAIS
 # ==============================================================================
-# A chave da API agora é lida dos segredos do Streamlit
 try:
     CHAVE_API_GOOGLE = st.secrets["GOOGLE_API_KEY"]
 except (KeyError, FileNotFoundError):
-    CHAVE_API_GOOGLE = "" # Define como vazia se o segredo não for encontrado
+    CHAVE_API_GOOGLE = ""
 
 FATOR_CUSTO_DISTANCIA = 50
-MINUTOS_POR_KM = 3 # Premissa: Velocidade média de 20 km/h
+MINUTOS_POR_KM = 3
 
 # ==============================================================================
-# FUNÇÕES AUXILIARES DE PROCESSAMENTO (sem alterações)
+# FUNÇÕES AUXILIARES DE PROCESSAMENTO
 # ==============================================================================
 
 @st.cache_data
@@ -119,6 +149,7 @@ def preparar_dados(df_polos, df_equipes, df_servicos_raw, df_feriados, df_tempos
         st.error(f"ERRO ao preparar os dados: {e}")
         return None, None, None, None, None
 
+# ... (As outras funções como verificar_dia_restrito, obter_distancia_real_google, etc. continuam aqui, sem alterações)
 def verificar_dia_restrito(data_atual, municipios_do_polo, df_feriados):
     df_feriados.columns = [str(col).strip() for col in df_feriados.columns]
     if data_atual.weekday() in [4, 5, 6]:
@@ -365,16 +396,20 @@ def gerar_mapa_de_rotas(df_rotas, df_polos_info, polos_processados):
 st.set_page_config(layout="wide", page_title="Roteirizador Credit RJ")
 
 # --- ATUALIZAÇÃO: Título com Logo ---
-col1, col2 = st.columns([5, 1]) # Coluna do título maior que a do logo
+col1, col2 = st.columns([4, 1])
 with col1:
-    st.title(" Roteirizador Credit RJ ")
+    st.title("Roteirizador Credit RJ")
 with col2:
     try:
         st.image("Enel_Brasil_Nova_Marca.png", width=150)
     except Exception:
-        # Se a imagem não for encontrada, o app não quebra.
         pass
 
+# --- ATUALIZAÇÃO: Verificação de Login ---
+if not check_password():
+    st.stop() # Interrompe a execução do restante do app se o login falhar
+
+# O restante do código só é executado se o login for bem-sucedido.
 dados_config_carregados = carregar_dados_config()
 
 if all(df is not None for df in dados_config_carregados):
@@ -478,4 +513,3 @@ if all(df is not None for df in dados_config_carregados):
                                     st.download_button("Download Não Roteirizados (CSV)", servicos_nao_atendidos_df.to_csv(index=False, sep=';').encode('utf-8-sig'), "servicos_nao_roteirizados.csv", "text/csv", key='download-nao-roteirizados')
     else:
         st.info("Aguardando o carregamento do arquivo 'servicos.csv' na barra lateral para iniciar.")
-
