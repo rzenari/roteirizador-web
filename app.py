@@ -14,13 +14,17 @@ import io
 # ==============================================================================
 # CONFIGURAÇÕES GLOBAIS
 # ==============================================================================
-# ⚠️ INSIRA SUA CHAVE DA API DO GOOGLE AQUI ⚠️
-CHAVE_API_GOOGLE = "kbAIzaSyBldtILdvj5UAy_sYCSPrAL637DbclAE3k" 
+# ATUALIZAÇÃO: A chave da API agora é lida dos segredos do Streamlit
+try:
+    CHAVE_API_GOOGLE = st.secrets["GOOGLE_API_KEY"]
+except (KeyError, FileNotFoundError):
+    CHAVE_API_GOOGLE = "" # Define como vazia se o segredo não for encontrado
+
 FATOR_CUSTO_DISTANCIA = 50
 MINUTOS_POR_KM = 3 # Premissa: Velocidade média de 20 km/h
 
 # ==============================================================================
-# FUNÇÕES AUXILIARES DE PROCESSAMENTO
+# FUNÇÕES AUXILIARES DE PROCESSAMENTO (sem alterações)
 # ==============================================================================
 
 @st.cache_data
@@ -134,12 +138,11 @@ def verificar_dia_restrito(data_atual, municipios_do_polo, df_feriados):
     return False, ""
 
 def obter_distancia_real_google(origem_coords, destino_coords, waypoints_coords, chave_api):
-    if chave_api == "COLE_SUA_CHAVE_DE_API_AQUI" or not chave_api: return None
+    if not chave_api: return None
     base_url = "https://maps.googleapis.com/maps/api/directions/json"
     origin_str = f"{origem_coords[0]},{origem_coords[1]}"
     destination_str = f"{destino_coords[0]},{destino_coords[1]}"
     
-    # A função agora assume que recebe uma lista de waypoints dentro do limite
     waypoints_str = "|".join([f"{lat},{lon}" for lat, lon in waypoints_coords])
     params = {"origin": origin_str, "destination": destination_str, "waypoints": f"optimize:true|{waypoints_str}", "key": chave_api}
     
@@ -256,17 +259,15 @@ def executar_roteirizacao(params):
                         equipes_usadas += 1
                         gmaps_url, legs_info = "N/A", None
                         
-                        # --- ATUALIZAÇÃO: LÓGICA DE QUEBRA DE ROTAS PARA A API ---
                         if consultar_google_api == '1':
                             pontos_coords = [locations[idx + 1] for idx in pontos_da_rota_indices]
                             depot_coords = locations[0]
                             full_path_points = [depot_coords] + pontos_coords + [depot_coords]
                             
-                            chunk_size = 27 # Limite da API: origin + 25 waypoints + destination
+                            chunk_size = 27
                             all_legs_info = []
 
                             if len(full_path_points) > chunk_size:
-                                st.info(f"Rota da Equipe {tipo_equipe.capitalize()} {vehicle_id + 1} com {len(pontos_coords)} pontos será dividida em chamadas menores para a API do Google.")
                                 for i in range(0, len(full_path_points) - 1, chunk_size - 1):
                                     chunk = full_path_points[i : i + chunk_size]
                                     if len(chunk) < 2: continue
@@ -285,8 +286,6 @@ def executar_roteirizacao(params):
                             if legs_info:
                                 origin_url, waypoints_url = f"{depot_coords[0]},{depot_coords[1]}", "/".join([f"{lat},{lon}" for lat,lon in pontos_coords])
                                 gmaps_url = f"https://www.google.com/maps/dir/{origin_url}/{waypoints_url}/{origin_url}"
-                            elif len(pontos_coords) > 0:
-                                st.warning(f"AVISO: Falha na consulta à API do Google para a Equipe {tipo_equipe.capitalize()} {vehicle_id + 1}. Usando apenas estimativas locais.")
                         
                         ponto_anterior_loc = locations[0]
                         for i, serv_idx in enumerate(pontos_da_rota_indices):
@@ -363,7 +362,7 @@ def gerar_mapa_de_rotas(df_rotas, df_polos_info, polos_processados):
 # INTERFACE DA APLICAÇÃO WEB (STREAMLIT)
 # ==============================================================================
 
-st.set_page_config(layout="wide", page_title="Roteirizador Inteligente")
+st.set_page_config(layout="wide", page_title="Roteirizador Credit RJ")
 st.title(" Roteirizador Inteligente ")
 
 dados_config_carregados = carregar_dados_config()
@@ -469,4 +468,3 @@ if all(df is not None for df in dados_config_carregados):
                                     st.download_button("Download Não Roteirizados (CSV)", servicos_nao_atendidos_df.to_csv(index=False, sep=';').encode('utf-8-sig'), "servicos_nao_roteirizados.csv", "text/csv", key='download-nao-roteirizados')
     else:
         st.info("Aguardando o carregamento do arquivo 'servicos.csv' na barra lateral para iniciar.")
-
