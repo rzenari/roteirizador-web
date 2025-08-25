@@ -12,6 +12,17 @@ import requests
 import io
 
 # ==============================================================================
+# CONFIGURAÇÕES GLOBAIS
+# ==============================================================================
+try:
+    CHAVE_API_GOOGLE = st.secrets["GOOGLE_API_KEY"]
+except (KeyError, FileNotFoundError):
+    CHAVE_API_GOOGLE = ""
+
+FATOR_CUSTO_DISTANCIA = 50
+MINUTOS_POR_KM = 3
+
+# ==============================================================================
 # FUNÇÃO DE LOGIN
 # ==============================================================================
 
@@ -41,17 +52,6 @@ def check_password():
     else:
         login_form()
         return False
-
-# ==============================================================================
-# CONFIGURAÇÕES GLOBAIS
-# ==============================================================================
-try:
-    CHAVE_API_GOOGLE = st.secrets["GOOGLE_API_KEY"]
-except (KeyError, FileNotFoundError):
-    CHAVE_API_GOOGLE = ""
-
-FATOR_CUSTO_DISTANCIA = 50
-MINUTOS_POR_KM = 3
 
 # ==============================================================================
 # FUNÇÕES AUXILIARES DE PROCESSAMENTO
@@ -149,7 +149,6 @@ def preparar_dados(df_polos, df_equipes, df_servicos_raw, df_feriados, df_tempos
         st.error(f"ERRO ao preparar os dados: {e}")
         return None, None, None, None, None
 
-# ... (As outras funções como verificar_dia_restrito, obter_distancia_real_google, etc. continuam aqui, sem alterações)
 def verificar_dia_restrito(data_atual, municipios_do_polo, df_feriados):
     df_feriados.columns = [str(col).strip() for col in df_feriados.columns]
     if data_atual.weekday() in [4, 5, 6]:
@@ -352,10 +351,17 @@ def executar_roteirizacao(params):
     
     resumo_equipes_df = pd.DataFrame()
     if not todas_as_rotas_df.empty:
-        df_resumo = todas_as_rotas_df.groupby('Equipe').agg(Quantidade_servicos_alocados=('ID_Servico', lambda x: (x != 'RETORNO_AO_DEPOSITO').sum()), KM_percorridos=('KM_Trecho_Estimado', 'sum'), Tempo_total_deslocamento=('Tempo_Trecho_Estimado_Min', 'sum'), Tempo_total_servicos=('Tempo_Execucao_Min', 'sum')).reset_index()
+        # ATUALIZAÇÃO: Adiciona a soma de 'Valor_Divida' ao resumo
+        df_resumo = todas_as_rotas_df.groupby('Equipe').agg(
+            Quantidade_servicos_alocados=('ID_Servico', lambda x: (x != 'RETORNO_AO_DEPOSITO').sum()),
+            Valor_Total_Divida_R$=('Valor_Divida', 'sum'),
+            KM_percorridos=('KM_Trecho_Estimado', 'sum'),
+            Tempo_total_deslocamento=('Tempo_Trecho_Estimado_Min', 'sum'),
+            Tempo_total_servicos=('Tempo_Execucao_Min', 'sum')
+        ).reset_index()
         df_resumo['Tempo_total_rota'] = df_resumo['Tempo_total_deslocamento'] + df_resumo['Tempo_total_servicos']
-        resumo_equipes_df = df_resumo.round(2)
-
+        resumo_equipes_df = df_resumo
+    
     return todas_as_rotas_df, servicos_nao_atendidos_df, resumo_equipes_df, pd.DataFrame(dados_relatorio)
 
 def gerar_mapa_de_rotas(df_rotas, df_polos_info, polos_processados):
@@ -378,12 +384,15 @@ def gerar_mapa_de_rotas(df_rotas, df_polos_info, polos_processados):
         info_polo = df_polos_info[df_polos_info['Centro Operativo'] == polo_da_rota].iloc[0]
         polo_coords = (info_polo['latitude'], info_polo['longitude'])
         
-        pontos_da_rota = [polo_coords] + list(zip(rota_da_equipe['Latitude'], rota_da_equipe['Longitude'])) + [polo_coords]
+        # Merge para obter coordenadas, pois o df_rotas pode não tê-las
+        rota_com_coords = pd.merge(rota_da_equipe, st.session_state.df_servicos[['ID_Servico', 'Latitude', 'Longitude']], on='ID_Servico', how='left')
+        
+        pontos_da_rota = [polo_coords] + list(zip(rota_com_coords['Latitude'], rota_com_coords['Longitude'])) + [polo_coords]
         
         cor_da_rota = mapa_cores_equipe[equipe_unica]
         folium.PolyLine(pontos_da_rota, color=cor_da_rota, weight=3, opacity=0.8, tooltip=f"<strong>{equipe_unica}</strong>").add_to(mapa)
         
-        for _, servico in rota_da_equipe.iterrows():
+        for _, servico in rota_com_coords.iterrows():
             popup_html = f"<strong>Equipe:</strong> {servico['Equipe']}<br><strong>Ordem:</strong> {servico['Ordem_Visita']}<br><strong>ID Serviço:</strong> {servico['ID_Servico']}"
             folium.Marker(location=[servico['Latitude'], servico['Longitude']], popup=folium.Popup(popup_html, max_width=300), icon=folium.Icon(color=cor_da_rota, icon='info-sign')).add_to(mapa)
             
@@ -395,7 +404,6 @@ def gerar_mapa_de_rotas(df_rotas, df_polos_info, polos_processados):
 
 st.set_page_config(layout="wide", page_title="Roteirizador Credit RJ")
 
-# --- ATUALIZAÇÃO: Título com Logo ---
 col1, col2 = st.columns([4, 1])
 with col1:
     st.title("Roteirizador Credit RJ")
@@ -405,11 +413,13 @@ with col2:
     except Exception:
         pass
 
-# --- ATUALIZAÇÃO: Verificação de Login ---
 if not check_password():
-    st.stop() # Interrompe a execução do restante do app se o login falhar
+    st.stop()
 
-# O restante do código só é executado se o login for bem-sucedido.
+# --- ATUALIZAÇÃO: Inicializa o estado da sessão para os resultados ---
+if 'results' not in st.session_state:
+    st.session_state.results = None
+
 dados_config_carregados = carregar_dados_config()
 
 if all(df is not None for df in dados_config_carregados):
@@ -426,6 +436,7 @@ if all(df is not None for df in dados_config_carregados):
 
             if all(dp is not None for dp in dados_preparados):
                 df_servicos, df_polos_completo, df_feriados, JORNADA_TRABALHO_MIN, SERVICOS_EXTRAS_IMPRODUTIVIDADE = dados_preparados
+                st.session_state.df_servicos = df_servicos # Salva para uso no mapa
 
                 hoje, dia_semana = date.today(), date.today().weekday()
                 if dia_semana in [0, 1, 2, 3]: data_despacho = hoje + timedelta(days=1)
@@ -467,6 +478,7 @@ if all(df is not None for df in dados_config_carregados):
 
                         if df_servicos_filtrado.empty:
                             st.warning("Nenhum serviço encontrado para os filtros selecionados.")
+                            st.session_state.results = None # Limpa resultados antigos
                         else:
                             with st.spinner('Aguarde... Otimizando as rotas. Isso pode levar alguns minutos.'):
                                 params = {
@@ -480,36 +492,72 @@ if all(df is not None for df in dados_config_carregados):
                                     "SERVICOS_EXTRAS_IMPRODUTIVIDADE": SERVICOS_EXTRAS_IMPRODUTIVIDADE
                                 }
                                 
-                                todas_as_rotas_df, servicos_nao_atendidos_df, resumo_equipes_df, dados_relatorio_df = executar_roteirizacao(params)
+                                # ATUALIZAÇÃO: Salva os resultados no estado da sessão
+                                st.session_state.results = executar_roteirizacao(params)
 
-                                st.success("Roteirização concluída com sucesso!")
-                                
-                                rotas_com_coords = pd.merge(todas_as_rotas_df[todas_as_rotas_df['ID_Servico'] != 'RETORNO_AO_DEPOSITO'], df_servicos[['ID_Servico', 'Latitude', 'Longitude']], on='ID_Servico', how='left')
+# --- ATUALIZAÇÃO: Bloco de exibição de resultados, que lê do estado da sessão ---
+if st.session_state.results:
+    todas_as_rotas_df, servicos_nao_atendidos_df, resumo_equipes_df, _ = st.session_state.results
 
-                                tab1, tab2, tab3, tab4 = st.tabs(["📊 Resumo das Equipes", "🗺️ Mapa das Rotas", "📋 Rotas Detalhadas", "🚫 Serviços Não Roteirizados"])
+    # ATUALIZAÇÃO: Função para formatar e converter para CSV com vírgula
+    def format_and_prepare_csv(df, columns_to_format):
+        df_display = df.copy()
+        for col, fmt in columns_to_format.items():
+            if col in df_display.columns:
+                # Converte para string e substitui ponto por vírgula para exibição
+                df_display[col] = df_display[col].apply(lambda x: f'{x:.2f}'.replace('.', ',') if isinstance(x, (int, float)) else x)
+        # Para o CSV, o parâmetro 'decimal' cuida da conversão
+        return df_display, df.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
 
-                                with tab1:
-                                    st.subheader("Resumo por Equipe")
-                                    st.dataframe(resumo_equipes_df)
-                                    st.download_button("Download Resumo (CSV)", resumo_equipes_df.to_csv(index=False, sep=';').encode('utf-8-sig'), "resumo_equipes.csv", "text/csv", key='download-resumo')
+    # Preparando os dataframes para exibição e download
+    resumo_cols_format = {
+        'Valor_Total_Divida_R$': 'R$ {}', 'KM_percorridos': '{}', 
+        'Tempo_total_deslocamento': '{}', 'Tempo_total_servicos': '{}', 'Tempo_total_rota': '{}'
+    }
+    resumo_display, resumo_csv = format_and_prepare_csv(resumo_equipes_df, resumo_cols_format)
+    
+    rotas_cols_format = {
+        'Valor_Divida': 'R$ {}', 'Tempo_Execucao_Min': '{}', 'KM_Trecho_Estimado': '{}',
+        'Tempo_Trecho_Estimado_Min': '{}', 'KM_Trecho_Google': '{}', 'Tempo_Trecho_Google_Min': '{}'
+    }
+    rotas_display, rotas_csv = format_and_prepare_csv(todas_as_rotas_df[todas_as_rotas_df['ID_Servico'] != 'RETORNO_AO_DEPOSITO'], rotas_cols_format)
+    
+    nao_atendidos_display, nao_atendidos_csv = format_and_prepare_csv(servicos_nao_atendidos_df, {})
 
-                                with tab2:
-                                    st.subheader("Mapa Interativo das Rotas")
-                                    mapa_folium = gerar_mapa_de_rotas(rotas_com_coords, df_polos_completo, polos_para_processar)
-                                    if mapa_folium:
-                                        st_folium(mapa_folium, width=1200, height=600, returned_objects=[])
-                                    else:
-                                        st.warning("Nenhuma rota gerada para exibir no mapa.")
+    st.success("Roteirização concluída!")
+    
+    tab1, tab2, tab3, tab4 = st.tabs(["📊 Resumo das Equipes", "🗺️ Mapa das Rotas", "📋 Rotas Detalhadas", "🚫 Serviços Não Roteirizados"])
 
-                                with tab3:
-                                    st.subheader("Detalhes das Rotas Otimizadas")
-                                    df_para_mostrar = todas_as_rotas_df[todas_as_rotas_df['ID_Servico'] != 'RETORNO_AO_DEPOSITO']
-                                    st.dataframe(df_para_mostrar)
-                                    st.download_button("Download Rotas (CSV)", df_para_mostrar.to_csv(index=False, sep=';').encode('utf-8-sig'), "rotas_otimizadas.csv", "text/csv", key='download-rotas')
+    with tab1:
+        st.subheader("Resumo por Equipe")
+        st.dataframe(resumo_display)
+        st.download_button("Download Resumo (CSV)", resumo_csv, "resumo_equipes.csv", "text/csv", key='download-resumo')
 
-                                with tab4:
-                                    st.subheader("Serviços Não Roteirizados")
-                                    st.dataframe(servicos_nao_atendidos_df)
-                                    st.download_button("Download Não Roteirizados (CSV)", servicos_nao_atendidos_df.to_csv(index=False, sep=';').encode('utf-8-sig'), "servicos_nao_roteirizados.csv", "text/csv", key='download-nao-roteirizados')
-    else:
-        st.info("Aguardando o carregamento do arquivo 'servicos.csv' na barra lateral para iniciar.")
+    with tab2:
+        st.subheader("Mapa Interativo das Rotas")
+        if not resumo_equipes_df.empty:
+            equipes_disponiveis = sorted(resumo_equipes_df['Equipe'].unique())
+            equipes_selecionadas = st.multiselect("Filtrar Equipes no Mapa:", options=["Todas as Equipes"] + equipes_disponiveis, default="Todas as Equipes")
+            
+            if "Todas as Equipes" in equipes_selecionadas or not equipes_selecionadas:
+                rotas_para_mapa = todas_as_rotas_df
+            else:
+                rotas_para_mapa = todas_as_rotas_df[todas_as_rotas_df['Equipe'].isin(equipes_selecionadas)]
+            
+            mapa_folium = gerar_mapa_de_rotas(rotas_para_mapa, df_polos_completo, polos_para_processar)
+            if mapa_folium:
+                st_folium(mapa_folium, width=1200, height=600, returned_objects=[])
+            else:
+                st.warning("Nenhuma rota para exibir no mapa com os filtros atuais.")
+        else:
+            st.warning("Nenhuma equipe roteirizada para exibir no mapa.")
+
+    with tab3:
+        st.subheader("Detalhes das Rotas Otimizadas")
+        st.dataframe(rotas_display)
+        st.download_button("Download Rotas (CSV)", rotas_csv, "rotas_otimizadas.csv", "text/csv", key='download-rotas')
+
+    with tab4:
+        st.subheader("Serviços Não Roteirizados")
+        st.dataframe(nao_atendidos_display)
+        st.download_button("Download Não Roteirizados (CSV)", nao_atendidos_csv, "servicos_nao_roteirizados.csv", "text/csv", key='download-nao-roteirizados')
