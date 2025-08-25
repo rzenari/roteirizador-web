@@ -351,7 +351,6 @@ def executar_roteirizacao(params):
     
     resumo_equipes_df = pd.DataFrame()
     if not todas_as_rotas_df.empty:
-        # ATUALIZAÇÃO: Adiciona a soma de 'Valor_Divida' ao resumo
         df_resumo = todas_as_rotas_df.groupby('Equipe').agg(
             Quantidade_servicos_alocados=('ID_Servico', lambda x: (x != 'RETORNO_AO_DEPOSITO').sum()),
             Valor_Total_Divida=('Valor_Divida', 'sum'),
@@ -359,7 +358,6 @@ def executar_roteirizacao(params):
             Tempo_total_deslocamento=('Tempo_Trecho_Estimado_Min', 'sum'),
             Tempo_total_servicos=('Tempo_Execucao_Min', 'sum')
         ).reset_index()
-        # Renomeia a coluna para o formato final com R$
         df_resumo.rename(columns={'Valor_Total_Divida': 'Valor_Total_Divida_R$'}, inplace=True)
         df_resumo['Tempo_total_rota'] = df_resumo['Tempo_total_deslocamento'] + df_resumo['Tempo_total_servicos']
         resumo_equipes_df = df_resumo
@@ -386,7 +384,6 @@ def gerar_mapa_de_rotas(df_rotas, df_polos_info, polos_processados):
         info_polo = df_polos_info[df_polos_info['Centro Operativo'] == polo_da_rota].iloc[0]
         polo_coords = (info_polo['latitude'], info_polo['longitude'])
         
-        # Merge para obter coordenadas, pois o df_rotas pode não tê-las
         rota_com_coords = pd.merge(rota_da_equipe, st.session_state.df_servicos[['ID_Servico', 'Latitude', 'Longitude']], on='ID_Servico', how='left')
         
         pontos_da_rota = [polo_coords] + list(zip(rota_com_coords['Latitude'], rota_com_coords['Longitude'])) + [polo_coords]
@@ -460,6 +457,8 @@ if all(df is not None for df in dados_config_carregados):
                 if st.sidebar.button(" Gerar Rotas ", use_container_width=True, type="primary"):
                     
                     polos_para_processar = polos_disponiveis[1:] if polo_selecionado_ui == "Processar TODOS" else [polo_selecionado_ui]
+                    st.session_state.polos_processados = polos_para_processar # Salva para uso no mapa
+                    
                     municipios_a_processar = df_servicos[df_servicos['Polo'].isin(polos_para_processar)]['Municipio'].unique()
                     restrito, motivo = verificar_dia_restrito(data_despacho, municipios_a_processar, df_feriados)
                     
@@ -533,6 +532,7 @@ if st.session_state.results:
             else:
                 rotas_para_mapa = todas_as_rotas_df[todas_as_rotas_df['Equipe'].isin(equipes_selecionadas)]
             
+            polos_para_processar = st.session_state.polos_processados
             mapa_folium = gerar_mapa_de_rotas(rotas_para_mapa, df_polos_completo, polos_para_processar)
             if mapa_folium:
                 st_folium(mapa_folium, width=1200, height=600, returned_objects=[])
