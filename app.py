@@ -532,8 +532,11 @@ if st.session_state.results:
             else:
                 rotas_para_mapa = todas_as_rotas_df[todas_as_rotas_df['Equipe'].isin(equipes_selecionadas)]
             
-            polos_para_processar = st.session_state.polos_processados
-            mapa_folium = gerar_mapa_de_rotas(rotas_para_mapa, df_polos_completo, polos_para_processar)
+            # ATUALIZAÇÃO: Filtra o 'RETORNO_AO_DEPOSITO' antes de passar para o mapa
+            rotas_para_mapa_sem_retorno = rotas_para_mapa[rotas_para_mapa['ID_Servico'] != 'RETORNO_AO_DEPOSITO']
+            
+            polos_para_processar = st.session_state.get('polos_processados', [])
+            mapa_folium = gerar_mapa_de_rotas(rotas_para_mapa_sem_retorno, df_polos_completo, polos_para_processar)
             if mapa_folium:
                 st_folium(mapa_folium, width=1200, height=600, returned_objects=[])
             else:
