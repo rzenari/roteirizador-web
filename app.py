@@ -354,11 +354,13 @@ def executar_roteirizacao(params):
         # ATUALIZAÇÃO: Adiciona a soma de 'Valor_Divida' ao resumo
         df_resumo = todas_as_rotas_df.groupby('Equipe').agg(
             Quantidade_servicos_alocados=('ID_Servico', lambda x: (x != 'RETORNO_AO_DEPOSITO').sum()),
-            Valor_Total_Divida_R$=('Valor_Divida', 'sum'),
+            Valor_Total_Divida=('Valor_Divida', 'sum'),
             KM_percorridos=('KM_Trecho_Estimado', 'sum'),
             Tempo_total_deslocamento=('Tempo_Trecho_Estimado_Min', 'sum'),
             Tempo_total_servicos=('Tempo_Execucao_Min', 'sum')
         ).reset_index()
+        # Renomeia a coluna para o formato final com R$
+        df_resumo.rename(columns={'Valor_Total_Divida': 'Valor_Total_Divida_R$'}, inplace=True)
         df_resumo['Tempo_total_rota'] = df_resumo['Tempo_total_deslocamento'] + df_resumo['Tempo_total_servicos']
         resumo_equipes_df = df_resumo
     
@@ -416,7 +418,6 @@ with col2:
 if not check_password():
     st.stop()
 
-# --- ATUALIZAÇÃO: Inicializa o estado da sessão para os resultados ---
 if 'results' not in st.session_state:
     st.session_state.results = None
 
@@ -436,7 +437,7 @@ if all(df is not None for df in dados_config_carregados):
 
             if all(dp is not None for dp in dados_preparados):
                 df_servicos, df_polos_completo, df_feriados, JORNADA_TRABALHO_MIN, SERVICOS_EXTRAS_IMPRODUTIVIDADE = dados_preparados
-                st.session_state.df_servicos = df_servicos # Salva para uso no mapa
+                st.session_state.df_servicos = df_servicos
 
                 hoje, dia_semana = date.today(), date.today().weekday()
                 if dia_semana in [0, 1, 2, 3]: data_despacho = hoje + timedelta(days=1)
@@ -478,7 +479,7 @@ if all(df is not None for df in dados_config_carregados):
 
                         if df_servicos_filtrado.empty:
                             st.warning("Nenhum serviço encontrado para os filtros selecionados.")
-                            st.session_state.results = None # Limpa resultados antigos
+                            st.session_state.results = None
                         else:
                             with st.spinner('Aguarde... Otimizando as rotas. Isso pode levar alguns minutos.'):
                                 params = {
@@ -492,34 +493,22 @@ if all(df is not None for df in dados_config_carregados):
                                     "SERVICOS_EXTRAS_IMPRODUTIVIDADE": SERVICOS_EXTRAS_IMPRODUTIVIDADE
                                 }
                                 
-                                # ATUALIZAÇÃO: Salva os resultados no estado da sessão
                                 st.session_state.results = executar_roteirizacao(params)
 
-# --- ATUALIZAÇÃO: Bloco de exibição de resultados, que lê do estado da sessão ---
 if st.session_state.results:
     todas_as_rotas_df, servicos_nao_atendidos_df, resumo_equipes_df, _ = st.session_state.results
 
-    # ATUALIZAÇÃO: Função para formatar e converter para CSV com vírgula
     def format_and_prepare_csv(df, columns_to_format):
         df_display = df.copy()
-        for col, fmt in columns_to_format.items():
+        for col in columns_to_format:
             if col in df_display.columns:
-                # Converte para string e substitui ponto por vírgula para exibição
                 df_display[col] = df_display[col].apply(lambda x: f'{x:.2f}'.replace('.', ',') if isinstance(x, (int, float)) else x)
-        # Para o CSV, o parâmetro 'decimal' cuida da conversão
         return df_display, df.to_csv(index=False, sep=';', decimal=',').encode('utf-8-sig')
 
-    # Preparando os dataframes para exibição e download
-    resumo_cols_format = {
-        'Valor_Total_Divida_R$': 'R$ {}', 'KM_percorridos': '{}', 
-        'Tempo_total_deslocamento': '{}', 'Tempo_total_servicos': '{}', 'Tempo_total_rota': '{}'
-    }
+    resumo_cols_format = ['Valor_Total_Divida_R$', 'KM_percorridos', 'Tempo_total_deslocamento', 'Tempo_total_servicos', 'Tempo_total_rota']
     resumo_display, resumo_csv = format_and_prepare_csv(resumo_equipes_df, resumo_cols_format)
     
-    rotas_cols_format = {
-        'Valor_Divida': 'R$ {}', 'Tempo_Execucao_Min': '{}', 'KM_Trecho_Estimado': '{}',
-        'Tempo_Trecho_Estimado_Min': '{}', 'KM_Trecho_Google': '{}', 'Tempo_Trecho_Google_Min': '{}'
-    }
+    rotas_cols_format = ['Valor_Divida', 'Tempo_Execucao_Min', 'KM_Trecho_Estimado', 'Tempo_Trecho_Estimado_Min', 'KM_Trecho_Google', 'Tempo_Trecho_Google_Min']
     rotas_display, rotas_csv = format_and_prepare_csv(todas_as_rotas_df[todas_as_rotas_df['ID_Servico'] != 'RETORNO_AO_DEPOSITO'], rotas_cols_format)
     
     nao_atendidos_display, nao_atendidos_csv = format_and_prepare_csv(servicos_nao_atendidos_df, {})
